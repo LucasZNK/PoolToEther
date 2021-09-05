@@ -9,7 +9,7 @@ describe("Members tests", () => {
     [owner, addr1, addr2] = await ethers.getSigners();
   });
 
-  describe("Deployment and team members ", async () => {
+  describe("Deployment and team members", async () => {
     it("should set the right owner", async () => {
       expect(await poolContract.owner()).to.equal(owner.address);
     });
@@ -55,10 +55,63 @@ describe("Members tests", () => {
       await poolContract.manageMember(addr1.address, false);
 
       await expect(
-         poolContract.connect(addr1).depositRewardsPool({
+        poolContract.connect(addr1).depositRewardsPool({
           value: ethers.utils.parseEther("30"),
         })
       ).to.be.revertedWith("Only team members can deposit rewards");
+    });
+  });
+});
+
+describe("Users tests", () => {
+  let PoolContract, poolContract, owner, addr1, addr2;
+
+  beforeEach(async () => {
+    PoolContract = await ethers.getContractFactory("PoolToEther");
+    poolContract = await PoolContract.deploy();
+    [owner, addr1, addr2] = await ethers.getSigners();
+  });
+
+  describe("User deposits", () => {
+    it("should team members can't deposit in the reward pools", async () => {
+      await poolContract.manageMember(addr1.address, true);
+      await expect(
+        poolContract.connect(addr1).depositFunds({
+          value: ethers.utils.parseEther("30"),
+        })
+      ).to.be.revertedWith("Team members address can't participate");
+    });
+
+    it("should users can deposit funds", async () => {
+      await poolContract.manageMember(addr1.address, false);
+      await expect(
+        poolContract.connect(addr1).depositFunds({
+          value: ethers.utils.parseEther("30"),
+        })
+      ).to.be.not.reverted;
+    });
+
+    it("should deposit be reflecred on the user ammount", async () => {
+      await poolContract.connect(addr1).depositFunds({
+        value: ethers.utils.parseEther("15.2"),
+      });
+      const balance = await poolContract.getUserBalance(addr1.address);
+      const formattedUserBalance =  await ethers.utils.formatEther(balance);
+       expect(formattedUserBalance ).to.be.equal("15.2");
+    });
+
+    it("should deposit be reflected in the total pool ammount", async () => {
+      await poolContract.connect(addr1).depositFunds({
+        value: ethers.utils.parseEther("15"),
+      });
+      await poolContract.connect(addr2).depositFunds({
+        value: ethers.utils.parseEther("15"),
+      });
+
+      const balance = await poolContract.getTotalFundsInPool();
+
+      const formattedPoolBalance =  await ethers.utils.formatEther(balance);
+       expect(formattedPoolBalance ).to.be.equal("30.0");
     });
   });
 });
